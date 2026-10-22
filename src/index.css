@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body { @apply bg-bg font-sans text-navy antialiased; font-feature-settings: 'cv11', 'ss01'; -webkit-tap-highlight-color: transparent; }
+  input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 26px; width: 26px; border-radius: 999px; background: #fff; border: 3px solid #16A34A; box-shadow: 0 2px 8px rgba(15,27,61,.25); margin-top: -10px; cursor: grab; }
+  input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: transparent; }
+  input[type=range]::-moz-range-thumb { height: 22px; width: 22px; border-radius: 999px; background: #fff; border: 3px solid #16A34A; }
+  input[type=range]:focus-visible { outline: none; }
+  input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 6px rgba(22,163,74,.25); }
+}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+@keyframes shake { 0%,100% { transform: none } 20%,60% { transform: translateX(-7px) } 40%,80% { transform: translateX(7px) } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+}

@@ -1,0 +1,68 @@
+import { chromium } from 'playwright-core'
+const BASE = process.env.BASE || 'http://localhost:4173'
+const OUT = '/workspace/fuel-app/web-shots/qa'
+const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] })
+const errors = []
+const mk = async (vp) => { const ctx = await browser.newContext({ viewport: vp, deviceScaleFactor: 2, locale: 'en-IN', timezoneId: 'Asia/Kolkata' }); const p = await ctx.newPage(); p.on('pageerror', (e) => errors.push(`${p.url()} :: ${e.message}`)); p.on('console', (m) => { if (m.type() === 'error') errors.push(`${p.url()} :: console ${m.text()}`) }); return { ctx, p } }
+const { ctx, p } = await mk({ width: 390, height: 844 })
+const shot = (n) => p.screenshot({ path: `${OUT}/${n}.png` })
+const click = async (t, opts = {}) => { await p.getByRole('button', { name: t, ...opts }).first().click(); await p.waitForTimeout(350) }
+const step = async (name, fn) => { try { await fn(); console.log('ok', name) } catch (e) { console.log('FAIL', name, e.message.split('\n')[0]); await shot('fail-' + name) } }
+
+await step('splash', async () => { await p.goto(BASE + '/'); await p.waitForTimeout(800); await shot('01-splash') })
+await step('login', async () => { await click('Get started'); await click('Use demo number'); await click('Send OTP'); await p.waitForURL('**/otp**'); await shot('02-otp') })
+await step('otp-wrong', async () => { await p.getByLabel('Digit 1').fill('111111'); await p.waitForTimeout(900); await shot('03-otp-wrong') })
+await step('otp', async () => { await p.getByLabel('Digit 1').fill('123456'); await p.waitForURL('**/location', { timeout: 5000 }) })
+await step('location', async () => { await click('Allow location access'); await p.waitForTimeout(1500); await shot('04-location'); await click('Confirm this location') })
+await step('address', async () => { await p.getByLabel('Flat / house no. & building').fill('Flat 1204, Tower B, Sobha Daffodil'); await p.getByLabel(/Parking spot/).fill('Basement B2, slot 114'); await shot('05-address'); await click('Save address'); await p.waitForURL('**/vehicle/add') })
+await step('vehicle', async () => { await shot('06-vehicle-list'); await p.getByText('Tata Nexon EV (LR)').click(); await p.getByLabel('Registration number').fill('KA 01 MX 4521'); await shot('07-vehicle-detail'); await click('Save vehicle'); await p.waitForURL('**/home') })
+await step('home', async () => { await p.waitForTimeout(900); await shot('08-home') })
+await step('book', async () => { await click(/Charge now/); await p.waitForURL('**/book'); await p.waitForTimeout(400); await shot('09-book') })
+await step('checkout', async () => { await click('Continue'); await p.waitForURL('**/checkout'); await click(/Apply a coupon/); await p.waitForTimeout(300); await shot('10-coupons'); await p.getByRole('button', { name: 'Apply', exact: true }).nth(1).click(); await p.waitForTimeout(300); await p.getByRole('radio', { name: /Card/ }).click(); await shot('11-checkout'); await p.evaluate(() => document.querySelector('main')?.scrollTo(0, 9999)); await p.waitForTimeout(200); await shot('11b-checkout-bottom') })
+await step('pay', async () => { await click(/^Pay /); await p.waitForURL('**/booked/**', { timeout: 6000 }); await p.waitForTimeout(600); await shot('12-booked') })
+await step('track', async () => { await click('Track your van'); await p.waitForTimeout(1200); await shot('13-searching'); await p.waitForTimeout(14000); await shot('14-tracking') })
+await step('cancel-sheet', async () => { await click('Cancel booking'); await p.waitForTimeout(400); await shot('15-cancel'); await click('Keep my booking') })
+await step('session', async () => { await p.goto(BASE + '/home'); await p.evaluate(() => {}); })
+// use demo menu
+const demo = async (title) => { await p.getByRole('button', { name: 'Open demo scenarios' }).click(); await p.waitForTimeout(300); await p.getByRole('button', { name: new RegExp('^' + title) }).click(); await p.waitForTimeout(900) }
+await step('demo-session', async () => { await demo('Jump to a live session'); await p.waitForTimeout(9000); await shot('16-session') })
+await step('demo-stop', async () => { await click('Stop'); await p.waitForTimeout(300); await shot('17-stop-sheet'); await click(/^Stop at/); await p.waitForURL('**/receipt/**'); await p.waitForTimeout(500); await shot('18-receipt'); await p.getByRole('radio', { name: '5 stars' }).click(); await shot('18b-rating'); await click('Submit rating') })
+await step('demo-interrupt', async () => { await demo('Session interrupted'); await p.waitForTimeout(20000); await shot('19-interrupted') })
+await step('demo-handshake', async () => { await demo('Vehicle not accepting charge'); await p.waitForTimeout(4500); await shot('20-handshake') })
+await step('demo-nopartner', async () => { await demo('No partner available'); await p.waitForTimeout(4500); await shot('21-nopartner') })
+await step('demo-delay', async () => { await demo('Partner delayed'); await p.waitForTimeout(1500); await shot('22-delay') })
+await step('demo-payfail', async () => { await demo('Payment fails'); await click(/^Pay /); await p.waitForTimeout(1800); await shot('23-payfail'); await click(/^Retry/); await p.waitForTimeout(1800) })
+await step('demo-upi', async () => { await demo('UPI pending'); await p.waitForTimeout(1200); await shot('24-upi') })
+await step('demo-conn', async () => { await demo('Connector incompatible'); await shot('25-connector') })
+await step('demo-soc', async () => { await demo('Target below current'); await shot('26-soc') })
+await step('demo-small', async () => { await demo('Too little energy'); await shot('26b-small') })
+await step('demo-slots', async () => { await demo('No slots available'); await shot('27-noslots') })
+await step('demo-area', async () => { await demo('Outside service area'); await click('Check availability'); await p.waitForTimeout(400); await shot('28-waitlist') })
+await step('demo-loc', async () => { await demo('Location permission denied'); await click('Allow location access'); await p.waitForTimeout(1600); await shot('29-locdenied') })
+await step('demo-otp', async () => { await demo('Wrong or expired OTP'); await shot('30-otpexpired') })
+await step('demo-offline', async () => { await p.goto(BASE + '/home'); await p.waitForTimeout(700); await demo('Toggle offline'); await shot('31-offline'); await demo('Toggle offline') })
+await step('demo-empty', async () => { await demo('Empty states'); await p.waitForTimeout(700); await shot('32-empty') })
+await step('wallet', async () => { await p.goto(BASE + '/wallet'); await p.waitForTimeout(500); await shot('33-wallet') })
+await step('profile', async () => { await p.goto(BASE + '/profile'); await p.waitForTimeout(500); await shot('34-profile') })
+await step('support', async () => { await p.goto(BASE + '/support'); await p.waitForTimeout(500); await shot('35-support') })
+await step('bookings', async () => { await p.goto(BASE + '/bookings'); await p.waitForTimeout(800); await shot('36-bookings') })
+await step('fleet-mobile', async () => { await p.goto(BASE + '/fleet'); await p.waitForTimeout(900); await shot('37-fleet-mobile') })
+const state = await p.evaluate(() => localStorage.getItem('fueldrop.state.v4'))
+
+// desktop
+const d = await mk({ width: 1440, height: 900 })
+await d.p.goto(BASE + '/'); await d.p.evaluate((s) => localStorage.setItem('fueldrop.state.v4', s), state)
+const dshot = (n) => d.p.screenshot({ path: `${OUT}/${n}.png` })
+await step('d-home', async () => { await d.p.goto(BASE + '/home'); await d.p.waitForTimeout(1200); await dshot('40-desktop-home') })
+await step('d-fleet-signup', async () => { await d.p.goto(BASE + '/fleet/signup?gst=06AAKCS1234F1Z5'); await d.p.waitForTimeout(600); await dshot('41-fleet-gst-invalid'); await d.p.getByRole('button', { name: 'Use sample GSTIN' }).click(); await d.p.getByRole('button', { name: 'Create business account' }).click(); await d.p.waitForURL('**/fleet', { timeout: 5000 }); await d.p.waitForTimeout(1200); await dshot('42-fleet-dashboard') })
+await step('d-fleet-vehicles', async () => { await d.p.goto(BASE + '/fleet/vehicles?import=1'); await d.p.waitForTimeout(500); await d.p.getByRole('button', { name: /Use sample CSV/ }).click(); await d.p.waitForTimeout(400); await dshot('43-fleet-csv'); await d.p.getByRole('button', { name: /^Import \d+ valid/ }).click(); await d.p.waitForTimeout(400) })
+await step('d-fleet-schedule', async () => { await d.p.evaluate(() => { const s = JSON.parse(localStorage.getItem('fueldrop.state.v4')); s.fleet.credit.used = s.fleet.credit.limit - 3200; localStorage.setItem('fueldrop.state.v4', JSON.stringify(s)) }); await d.p.goto(BASE + '/fleet/schedule?big=1'); await d.p.waitForTimeout(600); await dshot('44-fleet-schedule'); await d.p.getByRole('button', { name: /Schedule on credit/ }).click(); await d.p.waitForTimeout(400); await dshot('45-fleet-credit'); await d.p.getByRole('button', { name: /^Pay .* now via UPI/ }).click(); await d.p.waitForTimeout(600); await dshot('46-fleet-scheduled') })
+await step('d-fleet-bookings', async () => { await d.p.goto(BASE + '/fleet/bookings'); await d.p.waitForTimeout(500); await dshot('47-fleet-sessions') })
+await step('d-fleet-invoices', async () => { await d.p.goto(BASE + '/fleet/invoices'); await d.p.waitForTimeout(500); await dshot('48-fleet-invoices') })
+await step('d-fleet-team', async () => { await d.p.goto(BASE + '/fleet/team'); await d.p.waitForTimeout(500); await dshot('49-fleet-team') })
+await step('d-fleet-credit', async () => { await d.p.goto(BASE + '/fleet/credit'); await d.p.waitForTimeout(500); await dshot('50-fleet-credit') })
+await step('d-admin', async () => { await d.p.goto(BASE + '/admin'); await d.p.waitForTimeout(1200); await dshot('51-admin') })
+await step('d-admin-assign', async () => { const sel = d.p.locator('select[aria-label^="Assign van"]').first(); const opts = await sel.locator('option:not([disabled])').allTextContents(); await sel.selectOption({ index: 1 + 0 }).catch(() => {}); await d.p.waitForTimeout(600); await dshot('52-admin-assigned'); console.log('opts', opts.length) })
+await step('d-invoice-print', async () => { const id = await d.p.evaluate(() => JSON.parse(localStorage.getItem('fueldrop.state.v4')).fleet.invoices[0].id); await d.p.goto(BASE + '/print/invoice/' + id); await d.p.waitForTimeout(800); await dshot('53-invoice-print') })
+console.log('ERRORS', JSON.stringify(errors, null, 1))
+await browser.close()

@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en-IN"><head><meta charset="UTF-8"><title>FuelDrop</title>
+<script>
+  // GitHub Pages SPA fallback: turn /fueldrop-mvp/admin into /fueldrop-mvp/#/admin
+  (function () {
+    var base = '/fueldrop-mvp/';
+    var l = window.location;
+    var rest = l.pathname.indexOf(base) === 0 ? l.pathname.slice(base.length) : l.pathname.replace(/^\//, '');
+    l.replace(base + '#/' + rest + l.search + l.hash.replace(/^#/, ''));
+  })();
+</script></head><body></body></html>
